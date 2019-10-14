@@ -9,4 +9,4 @@ A pipeline for creating a nn model for continous system dynamics
 
 ## Usage
 
-Run `python model_learning.py -h` for further information.
+Run `python nn_model_learning.py -h` for further information.
