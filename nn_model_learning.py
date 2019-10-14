@@ -1,4 +1,4 @@
-# Author: Akash Patel (apatel435)
+# Author: acxz
 # Date: 9/27/19
 # Brief: Generate a continous dynamics model
 
