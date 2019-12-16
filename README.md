@@ -7,6 +7,13 @@ A pipeline for creating a nn model for continous system dynamics
 
 - `python-pytorch` [Installation](https://pytorch.org/get-started/locally/)
 
+# Installation
+
+To install this package perform the following:
+
+    python setup.py build
+    sudo python setup.py install
+
 ## Usage
 
 Run `python nn_model_learning.py -h` for further information.
