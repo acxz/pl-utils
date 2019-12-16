@@ -18,4 +18,8 @@ setuptools.setup(
         "License :: GPLv3 License",
         "Operating System :: OS Independent",
     ],
+    install_requires=[
+        "torch",
+        "argparse",
+    ],
 )
