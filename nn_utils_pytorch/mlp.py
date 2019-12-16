@@ -30,13 +30,16 @@ class Net(torch.nn.Module):
         self.fc3 = torch.nn.Linear(hl2_size, output_dim)
 
     def forward(self, x):
-        x = torch.tanh(self.fc1(x))
-        x = torch.tanh(self.fc2(x))
-        x = torch.tanh(self.fc3(x))
+        x = self.fc1(x)
+        x = torch.tanh(x)
+        x = self.fc2(x)
+        x = torch.tanh(x)
+        x = self.fc3(x)
+
         return x
 
 
-def train(args, model, device, train_loader, optimizer, epoch):
+def train(model, device, train_loader, optimizer, epoch, log_interval):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
@@ -45,13 +48,12 @@ def train(args, model, device, train_loader, optimizer, epoch):
         loss = torch.nn.functional.mse_loss(output, target.float())
         loss.backward()
         optimizer.step()
-        if batch_idx % args.log_interval == 0:
+        if batch_idx % log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
 
-
-def test(args, model, device, test_loader):
+def test(model, device, test_loader):
     model.eval()
     test_loss = 0
     correct = 0
@@ -64,7 +66,8 @@ def test(args, model, device, test_loader):
                 output, target.float(), reduction='sum').item()
             # Measure accuracy
             pred = output
-            if (torch.allclose(pred, target.float(), atol = float(0.001))):
+            #print(abs(pred - target.float()))
+            if (torch.allclose(pred, target.float(), atol = float(1))):
                 correct += 1
 
     test_loss /= len(test_loader.dataset)
@@ -72,7 +75,6 @@ def test(args, model, device, test_loader):
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
-
 
 def main():
 
@@ -121,6 +123,21 @@ def main():
 
     args = parser.parse_args()
 
+    training_dataset = "../tab-parser/Flightlab_Flight_Data/19NOV18_Task10_Continous_flight10.tab.io.pkl"
+    testing_dataset = "../tab-parser/Flightlab_Flight_Data/19NOV18_Task10_Continous_flight11.tab.io.pkl"
+    batch_size = 100
+    test_batch_size = 1
+    epochs = 10
+    h1_size = 32
+    h2_size = 32
+    lr = 0.01
+    momentum = 0.5
+    no_cuda = False
+    seed = 1
+    log_interval = 10
+    save_model = "test.pt"
+    use_model = "test.pt"
+
     # TODO: Why is this here?
     torch.manual_seed(args.seed)
 
@@ -163,8 +180,8 @@ def main():
                 momentum=args.momentum)
 
     for epoch in range(1, args.epochs + 1):
-        train(args, model, device, train_loader, optimizer, epoch)
-        test(args, model, device, test_loader)
+        train(model, device, train_loader, optimizer, epoch)
+        test(model, device, test_loader)
 
     if (args.save_model != ""):
         torch.save(model.state_dict(), args.save_model)
