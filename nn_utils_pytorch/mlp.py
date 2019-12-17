@@ -15,7 +15,7 @@ class ModelMLP(torch.nn.Module):
     # Along with list of activation functions (prob just the actual functions
     # themselves
     def __init__(self, input_dim, output_dim, hl1_size, hl2_size):
-        super(Net, self).__init__()
+        super(ModelMLP, self).__init__()
         self.fc1 = torch.nn.Linear(input_dim, hl1_size)
         self.fc2 = torch.nn.Linear(hl1_size, hl2_size)
         self.fc3 = torch.nn.Linear(hl2_size, output_dim)
@@ -33,7 +33,7 @@ class ModelMLP(torch.nn.Module):
     # TODO add time predictions
     # FIXME maybe easy way to reduce duplicate code in train and test
     # FIXME should epoch be displayed here or outside
-    def train(self, device, train_dataloader, optimizer, loss_func,
+    def train_model(self, device, train_dataloader, optimizer, loss_func,
             accuracy_func, display_status, current_epoch, final_epoch,
             batch_display_interval):
 
@@ -119,7 +119,7 @@ class ModelMLP(torch.nn.Module):
 
             print(epoch_status_string)
 
-    def test(self, device, test_dataloader, loss_func, accuracy_func,
+    def test_model(self, device, test_dataloader, loss_func, accuracy_func,
             display_status, current_epoch, final_epoch, batch_display_interval):
 
         # Set model in testing mode
@@ -315,7 +315,7 @@ def main():
     print(output_dim)
 
     # Initialize model
-    model=Net(input_dim, output_dim, args.h1_size, args.h2_size).to(device)
+    model=ModelMLP(input_dim, output_dim, args.h1_size, args.h2_size).to(device)
     if (args.use_model != ""):
         model.load_state_dict(torch.load(args.use_model), strict=False)
 
@@ -326,8 +326,8 @@ def main():
                 momentum=args.momentum)
 
     for epoch in range(1, args.epochs + 1):
-        train(model, device, train_dataloader, optimizer, epoch)
-        test(model, device, test_dataloader)
+        model.train_model(device, train_dataloader, optimizer, epoch)
+        model.test_model(device, test_dataloader)
 
     if (args.save_model != ""):
         torch.save(model.state_dict(), args.save_model)

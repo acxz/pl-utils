@@ -32,7 +32,7 @@ class ModelRNN(torch.nn.Module):
     # TODO add time predictions
     # FIXME maybe easy way to reduce duplicate code in train and test
     # FIXME should epoch be displayed here or outside
-    def train(self, device, train_dataloader, optimizer, loss_func,
+    def train_model(self, device, train_dataloader, optimizer, loss_func,
             accuracy_func, display_status, current_epoch, final_epoch,
             batch_display_interval):
 
@@ -126,7 +126,7 @@ class ModelRNN(torch.nn.Module):
             print(epoch_status_string)
 
     # Method to test model
-    def test(self, device, test_dataloader, loss_func, accuracy_func,
+    def test_model(self, device, test_dataloader, loss_func, accuracy_func,
             display_status, current_epoch, final_epoch, batch_display_interval):
 
         # Set model in testing mode
@@ -383,10 +383,10 @@ def main():
         else:
             epoch_display_status = False
 
-        model.train(device, train_dataloader, optimizer, loss_func,
+        model.train_model(device, train_dataloader, optimizer, loss_func,
         #        accuracy_func, epoch_display_status, epoch, epochs,
         #        batch_display_interval)
-        model.test(device, test_dataloader, loss_func, accuracy_func,
+        model.test_model(device, test_dataloader, loss_func, accuracy_func,
                 epoch_display_status, epoch, epochs, batch_display_interval)
 
     # Let us just test some predictions
