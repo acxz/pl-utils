@@ -1,28 +1,19 @@
 # Author: acxz
 # Date: 9/27/19
-# Brief: Generate a continous dynamics model
+# Brief: Class and methods for using a MLP
 
-import sys
+import argparse
+import functools
 import pickle
 import torch
-import argparse
+import sys
 
-# Define Dataset subclass to facilitate batch training
-class SimpleDataset(torch.utils.data.Dataset):
-    def __init__(self, X, Y):
-        self.X = X
-        self.Y = Y
+# Define structure of model
+class ModelMLP(torch.nn.Module):
 
-    def __len__(self):
-        return len(self.X)
-
-    def __getitem__(self, idx):
-        return self.X[idx], self.Y[idx]
-
-
-# Define structure of NN
-class Net(torch.nn.Module):
-
+    # TODO specify length and width of mlp via input vector tbh
+    # Along with list of activation functions (prob just the actual functions
+    # themselves
     def __init__(self, input_dim, output_dim, hl1_size, hl2_size):
         super(Net, self).__init__()
         self.fc1 = torch.nn.Linear(input_dim, hl1_size)
@@ -38,48 +29,203 @@ class Net(torch.nn.Module):
 
         return x
 
+    # Method to train model
+    # TODO add time predictions
+    # FIXME maybe easy way to reduce duplicate code in train and test
+    # FIXME should epoch be displayed here or outside
+    def train(self, device, train_dataloader, optimizer, loss_func,
+            accuracy_func, display_status, current_epoch, final_epoch,
+            batch_display_interval):
 
-def train(model, device, train_loader, optimizer, epoch, log_interval):
-    model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        output = model(data.float())
-        loss = torch.nn.functional.mse_loss(output, target.float())
-        loss.backward()
-        optimizer.step()
-        if batch_idx % log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item()))
+        # Set model in training mode
+        self.train()
 
-def test(model, device, test_loader):
-    model.eval()
-    test_loss = 0
-    correct = 0
-    with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data.float())
-            # sum up batch loss
-            test_loss += torch.nn.functional.mse_loss(
-                output, target.float(), reduction='sum').item()
-            # Measure accuracy
-            pred = output
-            #print(abs(pred - target.float()))
-            if (torch.allclose(pred, target.float(), atol = float(1))):
-                correct += 1
+        # Constants
+        total_batches = len(train_dataloader)
+        samples_per_batch = len(train_dataloader.dataset)
+        total_samples = total_batches * samples_per_batch
 
-    test_loss /= len(test_loader.dataset)
+        # Metrics to keep track throughout batches
+        total_loss = 0
+        total_num_correct = 0
 
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+        # Go through the training data one batch at a time
+        for batch_num, (input_, target) in enumerate(train_dataloader):
+            # Load data onto device
+            input_, target = input_.to(device), target.to(device)
 
+            # TODO: Is this needed
+            # Make sure input_, target is in float
+            input_ = input_.float()
+            target = target.float()
+
+            # TODO: what does this do?
+            optimizer.zero_grad()
+
+            # Predict
+            output = self(input_)
+
+            # Loss
+            batch_loss = loss_func(output, target)
+
+            # Backpropagate information and update gradients
+            batch_loss.backward()
+            optimizer.step()
+
+            # Epoch status
+            epoch_status = current_epoch / final_epoch * 100
+
+            # Batch status
+            batch_status = batch_num / total_batches * 100
+
+            # Average batch loss
+            total_loss = total_loss + batch_loss
+            avg_batch_loss = batch_loss / total_batches
+
+            # Batch accuracy
+            accuracy_count = [1 for i in range(0, len(output)) if
+                    accuracy_func(output[i], target[i]) == True]
+            batch_num_correct = sum(accuracy_count)
+            batch_accuracy = batch_num_correct / total_batches * 100
+            total_num_correct = total_num_correct + batch_num_correct
+
+            # Batch status information
+            if (display_status == True):
+                if (batch_num % batch_display_interval == 0):
+                    batch_status_string = ('[Training] Epoch: {}/{} ({:.0f}%) \t Batch: '
+                    '{}/{} ({:.0f}%) \t Average Batch Loss: {:.4f} \t Batch Accuracy: '
+                    '{}/{} ({:.0f}%)').format(current_epoch, final_epoch,
+                            epoch_status, batch_num, total_batches,
+                            batch_status, avg_batch_loss, batch_num_correct,
+                            samples_per_batch, batch_accuracy)
+
+                    print(batch_status_string)
+
+        # Epoch status
+        current_epoch = current_epoch + 1
+        epoch_status = current_epoch / final_epoch * 100
+
+        # Average total loss
+        avg_total_loss = total_loss / total_samples
+
+        # Total accuracy
+        total_accuracy = total_num_correct / total_samples
+
+        # Epoch status information
+        if (display_status == True):
+            epoch_status_string = ('[Training] Epoch: {}/{} ({:.0f}%) \t Average Loss: {:.4f} \t Accuracy: '
+            '{}/{} ({:.0f}%)\n').format(current_epoch, final_epoch, epoch_status,
+                    avg_total_loss, total_num_correct, total_samples, total_accuracy)
+
+            print(epoch_status_string)
+
+    def test(self, device, test_dataloader, loss_func, accuracy_func,
+            display_status, current_epoch, final_epoch, batch_display_interval):
+
+        # Set model in testing mode
+        self.eval()
+
+        # Constants
+        total_batches = len(test_dataloader)
+        samples_per_batch = len(test_dataloader.dataset)
+        total_samples = total_batches * samples_per_batch
+
+        # Metrics to keep track of throughout batches
+        total_loss = 0
+        total_num_correct = 0
+
+        # Don't need to worry about gradients when testing, only need it for
+        # backprop during training
+        with torch.no_grad():
+            # Go through the testing data one batch at a time
+            for batch_num, (input_, target) in enumerate(test_dataloader):
+                # Load data onto device
+                input_, target = input_.to(device), target.to(device)
+
+                # Make sure input_, target is in float
+                input_ = input_.float()
+                target = target.float()
+
+                # Predict
+                output = self(input_)
+
+                # Loss
+                batch_loss = loss_func(output, target)
+                total_loss = total_loss + batch_loss
+
+                # Epoch status
+                epoch_status = current_epoch / final_epoch * 100
+
+                # Batch status
+                batch_status = batch_num / total_batches * 100
+
+                # Average batch loss
+                avg_batch_loss = batch_loss / total_batches
+
+                # Batch accuracy
+                accuracy_count = [1 for i in range(0, len(output)) if
+                        accuracy_func(output[i], target[i]) == True]
+                batch_num_correct = sum(accuracy_count)
+                batch_accuracy = batch_num_correct / total_batches * 100
+                total_num_correct = total_num_correct + batch_num_correct
+
+                # Batch status information
+                if (display_status == True):
+                    if (batch_num % batch_display_interval == 0):
+                        batch_status_string = ('[Testing] Epoch: {}/{} ({:.0f}%) \t Batch: '
+                        '{}/{} ({:.0f}%) \t Average Batch Loss: {:.4f} \t Batch Accuracy: '
+                        '{}/{} ({:.0f}%)').format(current_epoch, final_epoch,
+                                epoch_status, batch_num, total_batches,
+                                batch_status, avg_batch_loss, batch_num_correct,
+                                samples_per_batch, batch_accuracy)
+
+                        print(batch_status_string)
+
+            # Epoch status
+            current_epoch = current_epoch + 1
+            epoch_status = current_epoch / final_epoch * 100
+
+            # Average total loss
+            avg_total_loss = total_loss / total_samples
+
+            # Total accuracy
+            total_accuracy = total_num_correct / total_samples
+
+            # Epoch status information
+            if (display_status == True):
+                epoch_status_string = ('[Testing] Epoch: {}/{} ({:.0f}%) \t Average Loss: {:.4f} \t Accuracy: '
+                '{}/{} ({:.0f}%)\n').format(current_epoch, final_epoch,
+                        epoch_status, avg_total_loss, total_num_correct,
+                        total_samples, total_accuracy)
+
+                print(epoch_status_string)
+
+# Define a custom Dataset class to facilitate training
+class CustomDataset(torch.utils.data.Dataset):
+    def __init__(self, X, Y):
+        self.X = torch.FloatTensor(X)
+        self.Y = torch.FloatTensor(Y)
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.Y[idx]
+
+# Method to evaluate accuracy
+# FIXME
+def check_accuracy(vector_1, vector_2):
+    is_accurate = False
+    if (torch.allclose(vector_1, vector_2, rtol=1e-05, atol=1e-08)):
+        is_accurate = True
+    return is_accurate
+
+# Main method to read in data and train/test/save model
+# TODO: Cleanup and argparse?
 def main():
 
     # Training settings
-    parser = argparse.ArgumentParser(description='Dynamics Model')
+    parser = argparse.ArgumentParser(description='Multilayer Perceptron Model')
     parser.add_argument(
         "--training-dataset",
         type=str,
@@ -155,11 +301,11 @@ def main():
     testing_dataset_input = testing_dataframe["INPUT"].values
     testing_dataset_output = testing_dataframe["OUTPUT"].values
 
-    train_loader = torch.utils.data.DataLoader(dataset=SimpleDataset(
+    train_dataloader = torch.utils.data.DataLoader(dataset=CustomDataset(
         training_dataset_input, training_dataset_output),
         batch_size=args.batch_size, shuffle=True, **kwargs)
 
-    test_loader = torch.utils.data.DataLoader(dataset=SimpleDataset(
+    test_dataloader = torch.utils.data.DataLoader(dataset=CustomDataset(
         testing_dataset_input, testing_dataset_output),
         batch_size = args.batch_size, shuffle = True, **kwargs)
 
@@ -180,8 +326,8 @@ def main():
                 momentum=args.momentum)
 
     for epoch in range(1, args.epochs + 1):
-        train(model, device, train_loader, optimizer, epoch)
-        test(model, device, test_loader)
+        train(model, device, train_dataloader, optimizer, epoch)
+        test(model, device, test_dataloader)
 
     if (args.save_model != ""):
         torch.save(model.state_dict(), args.save_model)
