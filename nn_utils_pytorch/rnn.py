@@ -284,6 +284,7 @@ def check_accuracy(vector_1, vector_2):
 
 # Main method to read in data and train/test/save model
 # TODO: Cleanup and argparse?
+""" Because some syntax error for a simple if statement ugh
 def main():
 
     training_dataset_filename = "../tab-parser/Flightlab_Flight_Data/19NOV18_Task10_Continous_flight10.tab.io.pkl"
@@ -406,8 +407,10 @@ def main():
     #print(my_hn)
 
     # Save the model
-    if(save_model != ""):
+    if (save_model != ""):
         torch.save(model.state_dict(), save_model)
+
 
 if __name__ == "__main__":
     main()
+"""
