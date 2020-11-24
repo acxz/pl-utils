@@ -36,8 +36,8 @@ class RandomDataModule(lt.core.datamodule.LightningDataModule):
         """Initialze variables."""
         super().__init__()
         self.hparams = hparams
+
         self.data = data
-        self.num_workers = 4
 
         self.train_input_data = None
         self.train_output_data = None
@@ -71,24 +71,27 @@ class RandomDataModule(lt.core.datamodule.LightningDataModule):
         """Create train dataloader."""
         train_split = VectorDataset(self.train_input_data,
                                     self.train_output_data)
-        return torch.utils.data.DataLoader(dataset=train_split,
-                                           num_workers=self.num_workers,
-                                           batch_size=self.hparams.batch_size,
-                                           shuffle=True)
+        return torch.utils.data.DataLoader(
+            dataset=train_split,
+            num_workers=self.hparams.data_num_workers,
+            batch_size=self.hparams.batch_size,
+            shuffle=True)
 
     def val_dataloader(self, *args, **kwargs):
         """Create val dataloader."""
         val_split = VectorDataset(self.val_input_data, self.val_output_data)
-        return torch.utils.data.DataLoader(dataset=val_split,
-                                           num_workers=self.num_workers,
-                                           batch_size=self.hparams.batch_size)
+        return torch.utils.data.DataLoader(
+            dataset=val_split,
+            num_workers=self.hparams.data_num_workers,
+            batch_size=self.hparams.batch_size)
 
     def test_dataloader(self, *args, **kwargs):
         """Create test dataloader."""
         test_split = VectorDataset(self.test_input_data, self.test_output_data)
-        return torch.utils.data.DataLoader(dataset=test_split,
-                                           num_workers=self.num_workers,
-                                           batch_size=self.hparams.batch_size)
+        return torch.utils.data.DataLoader(
+            dataset=test_split,
+            num_workers=self.hparams.data_num_workers,
+            batch_size=self.hparams.batch_size)
 
     @staticmethod
     def _split_input_output_data(data):
@@ -104,6 +107,7 @@ def main():
 
     # Add program specific args from model
     parser.add_argument('--batch_size', type=int, default=1)
+    parser.add_argument('--data_num_workers', type=int, default=1)
 
     # Add trainer specific args from model
     parser = lt.Trainer.add_argparse_args(parser)
@@ -111,7 +115,8 @@ def main():
     # Add model specific args from model
     parser = plu.models.fc.FCModel.add_model_specific_args(parser)
 
-    program_args_list = ['--batch_size', '8000']
+    program_args_list = ['--batch_size', '8000',
+                         '--data_num_workers', '4']
 
     training_args_list = ['--accumulate_grad_batches', '1',
                           '--auto_lr_find', 'False',
