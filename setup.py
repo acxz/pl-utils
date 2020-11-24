@@ -11,7 +11,7 @@ setuptools.setup(
     long_description=long_description,
     description='Some models and trainer scripts created using \
             pytorch-lightning.',
-    packages=['pl_utils'],
+    packages=setuptools.find_packages(),
     install_requires=[
         'argparse',
         'pytorch-lightning',
