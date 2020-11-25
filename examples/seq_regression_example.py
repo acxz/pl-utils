@@ -27,9 +27,9 @@ class VectorSeqDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         """Recover an item of dataset."""
-        return self.input_data[idx], \
-            (self.hidden_state_data[idx], self.cell_state_data[idx]), \
-            self.output_data[idx]
+        return self.input_data[:, idx], \
+            (self.hidden_state_data[:, idx], self.cell_state_data[:, idx]), \
+            self.output_data[:, idx]
 
 
 # pylint: disable=abstract-method
