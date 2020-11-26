@@ -32,12 +32,6 @@ class BIMOEGP(gpytorch.models.ExactGP):
         mean = self.mean_module(input_)
         covar = self.covar_module(input_)
 
-        # check mean function dim for output dim and see if I even need dim 1
-        # check
-        # import pdb; pdb.set_trace()
-        # if mean.shape[1] == 1:
-        #     return gpytorch.distributions.MultivariateNormal(mean, covar)
-
         return \
             gpytorch.distributions.MultitaskMultivariateNormal.from_batch_mvn(
                 gpytorch.distributions.MultivariateNormal(mean, covar))
@@ -53,10 +47,6 @@ class BIMOEGPModel(lt.core.lightning.LightningModule):
 
         self.hparams = hparams
 
-        # Is my likelihood automatically on the GPU as well as in train/eval
-        # mode automatically?
-        # likelihood.cuda() likelihood.train() likelihood.eval() ?
-        # I think so since it is a child module
         output_dim = train_output_data.shape[1]
         self.likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(
             num_tasks=output_dim)

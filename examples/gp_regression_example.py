@@ -120,10 +120,9 @@ def main():
     training_args_list = ['--accumulate_grad_batches', '1',
                           '--auto_lr_find', 'False',
                           '--benchmark', 'True',
-                          # '--fast_dev_run', 'False',
-                          '--fast_dev_run', 'True',
-                          # '--gpus', '-1',
-                          # '--precision', '16',
+                          '--fast_dev_run', 'False',
+                          '--gpus', '-1',
+                          '--precision', '16',
                           '--terminate_on_nan', 'True',
                           '--weights_summary', 'full']
 
@@ -134,7 +133,7 @@ def main():
     hparams = parser.parse_args(args_list)
 
     # Create random data to fit a fully connected network
-    samples = 8000
+    samples = 100
     input_dim = 3
     output_dim = 4
     random_data = torch.rand(samples, input_dim + output_dim)
@@ -142,8 +141,9 @@ def main():
     # Construct lightning data module for the dataset
     data_module = RandomDataModule(hparams, random_data)
 
-    # GP data preprocessing since it needs train_x, train_y during
-    # initialization which also need to be the same ones used in training
+    # GP data preprocessing since it needs train_input_data, train_output_data
+    # during initialization which also need to be the same ones used in
+    # training
     data_module.setup()
 
     # create model
