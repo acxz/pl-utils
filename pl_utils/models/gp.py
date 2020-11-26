@@ -93,33 +93,35 @@ class BIMOEGPModel(lt.core.lightning.LightningModule):
     # pylint: disable=unused-argument
     def validation_step(self, batch, batch_idx):
         """Compute validation loss."""
-        input_, target = batch
-        output = self(input_)
+        # input_, target = batch
+        # output = self(input_)
 
-        loss = -self.mll(output, target)
+        # loss = -self.mll(output, target)
 
-        return {'val_loss': loss}
+        # return {'val_loss': loss}
+        return 0
 
     # pylint: disable=no-self-use
     def validation_epoch_end(self, outputs):
         """Record validation loss."""
-        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        self.log('avg_val_loss', avg_loss)
+        # avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
+        # self.log('avg_val_loss', avg_loss)
 
     # pylint: disable=unused-argument
     def test_step(self, batch, batch_idx):
         """Compute testing loss."""
-        input_, target = batch
-        output = self(input_)
+        # input_, target = batch
+        # output = self(input_)
 
-        loss = -self.mll(output, target)
+        # loss = -self.mll(output, target)
 
-        return {'test_loss': loss}
+        # return {'test_loss': loss}
+        return 0
 
     def test_epoch_end(self, outputs):
         """Record average test loss."""
-        avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
-        self.log('avg_test_loss', avg_loss)
+        # avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
+        # self.log('avg_test_loss', avg_loss)
 
     @ staticmethod
     def add_model_specific_args(parent_parser):
