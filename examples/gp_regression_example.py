@@ -212,7 +212,8 @@ def main():
                 'dash': 'dot',
             },
             name='sin func',
-            showlegend=True
+            visible=False,
+            showlegend=False
         )
     )
 
@@ -222,9 +223,11 @@ def main():
             y=sin_output_data[:, 0],
             mode='markers',
             marker={
-                'color': 'blue',
+                'size': 10,
+                #'color': 'blue',
             },
-            name='sin data',
+            # name='sin data',
+            name='data samples',
             showlegend=True
         )
     )
@@ -234,10 +237,11 @@ def main():
             x=predict_input_data[:, 0],
             y=mean[:, 0],
             mode='lines',
-            line={
-                'color': 'blue',
-            },
-            name='sin mean',
+            # line={
+            #     'color': 'blue',
+            # },
+            # name='sin mean',
+            name='posterior mean',
             showlegend=True
         )
     )
@@ -279,14 +283,16 @@ def main():
             line={
                 'color': 'rgba(255, 255, 255, 0)',
             },
-            fillcolor='blue',
+            fillcolor='black',
             opacity=0.2,
             fill='toself',
-            name='sin confidence',
+            # name='sin confidence',
+            name='confidence region',
             showlegend=True
         )
     )
 
+    """
     fig.add_trace(
         go.Scatter(
             x=predict_input_data[:, 0],
@@ -370,6 +376,16 @@ def main():
             name='cos confidence',
             showlegend=True
         )
+    )
+    """
+
+    fig.update_layout(
+        title='Gaussian Process Regression',
+        xaxis_title='Input',
+        yaxis_title='Observation',
+        font={
+            'size': 18,
+        },
     )
 
     fig.show()
