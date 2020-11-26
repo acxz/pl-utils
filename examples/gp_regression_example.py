@@ -96,14 +96,16 @@ class RandomDataModule(lt.core.datamodule.LightningDataModule):
 
     @staticmethod
     def _split_input_output_data(data):
-        input_dim = 3
+        input_dim = 1
         input_data = data[:, 0:input_dim]
         output_data = data[:, input_dim:None]
         return input_data, output_data
 
 
+# pylint: disable=too-many-statements
+# pylint: disable=too-many-locals
 def main():
-    """Initialize model and trainer to fit a fc net."""
+    """Initialize model and trainer to fit."""
     parser = argparse.ArgumentParser()
 
     # Add program specific args from model
@@ -122,6 +124,7 @@ def main():
                           '--benchmark', 'True',
                           '--fast_dev_run', 'False',
                           '--gpus', '-1',
+                          '--max_epochs', '500',
                           '--precision', '16',
                           '--terminate_on_nan', 'True',
                           '--weights_summary', 'full']
@@ -132,14 +135,20 @@ def main():
 
     hparams = parser.parse_args(args_list)
 
-    # Create random data to fit a fully connected network
+    # Create data to fit
     samples = 100
-    input_dim = 3
-    output_dim = 4
-    random_data = torch.rand(samples, input_dim + output_dim)
+    input_data = torch.linspace(0, 1, samples).unsqueeze(1)
+    sin_output_data = torch.sin(input_data * (2 * math.pi)) + \
+        torch.randn(input_data.size()) * 0.2
+    cos_output_data = torch.cos(input_data * (2 * math.pi)) + \
+        torch.randn(input_data.size()) * 0.2
+    sinusoidal_data = torch.cat([input_data, sin_output_data, cos_output_data],
+                                1)
+    random_indices = torch.randperm(sinusoidal_data.shape[0])
+    sinusoidal_data = sinusoidal_data[random_indices]
 
     # Construct lightning data module for the dataset
-    data_module = RandomDataModule(hparams, random_data)
+    data_module = RandomDataModule(hparams, sinusoidal_data)
 
     # GP data preprocessing since it needs train_input_data, train_output_data
     # during initialization which also need to be the same ones used in
@@ -161,6 +170,172 @@ def main():
 
     # test on data
     trainer.test(model, datamodule=data_module)
+
+    # create some input data to be predicted on
+    samples = 1000
+    predict_input_data = torch.linspace(0, 1, samples).unsqueeze(1)
+
+    # load model
+    # gotta save the train data somehow prob just need to add a custom
+    # checkpoint callback
+    # checkpoint_path = 'lightning_logs/version_40/checkpoints/epoch=999.ckpt'
+    # model = plu.models.gp.BIMOEGPModel.load_from_checkpoint(checkpoint_path)
+
+    # predict on mode
+    model.eval()
+    with torch.no_grad():
+        predictions = model.likelihood(model(predict_input_data))
+        mean = predictions.mean
+        lower, upper = predictions.confidence_region()
+
+    # plots
+    # pylint: disable=import-outside-toplevel
+    import plotly.graph_objects as go
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=input_data[:, 0],
+            y=sin_output_data[:, 0],
+            mode='markers',
+            marker={
+                'color': 'blue',
+            },
+            name='sin data',
+            showlegend=True
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=predict_input_data[:, 0],
+            y=mean[:, 0],
+            mode='lines',
+            line={
+                'color': 'blue',
+            },
+            name='sin mean',
+            showlegend=True
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=predict_input_data[:, 0],
+            y=upper[:, 0],
+            mode='lines',
+            line={
+                'color': 'blue',
+                'dash': 'dot',
+            },
+            name='sin upper',
+            showlegend=True
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=predict_input_data[:, 0],
+            y=lower[:, 0],
+            mode='lines',
+            line={
+                'color': 'blue',
+                'dash': 'dot',
+            },
+            name='sin lower',
+            showlegend=True
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=torch.cat([predict_input_data[:, 0],
+                         torch.flip(predict_input_data[:, 0], [0])]),
+            y=torch.cat([upper[:, 0], torch.flip(lower[:, 0], [0])]),
+            mode='lines',
+            line={
+                'color': 'rgba(255, 255, 255, 0)',
+            },
+            fillcolor='blue',
+            opacity=0.2,
+            fill='toself',
+            name='sin confidence',
+            showlegend=True
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=input_data[:, 0],
+            y=cos_output_data[:, 0],
+            mode='markers',
+            marker={
+                'color': 'red',
+            },
+            name='cos data',
+            showlegend=True
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=predict_input_data[:, 0],
+            y=mean[:, 1],
+            mode='lines',
+            line={
+                'color': 'red',
+            },
+            name='cos mean',
+            showlegend=True
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=predict_input_data[:, 0],
+            y=upper[:, 1],
+            mode='lines',
+            line={
+                'color': 'red',
+                'dash': 'dot',
+            },
+            name='cos upper',
+            showlegend=True
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=predict_input_data[:, 0],
+            y=lower[:, 1],
+            mode='lines',
+            line={
+                'color': 'red',
+                'dash': 'dot',
+            },
+            name='cos lower',
+            showlegend=True
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=torch.cat([predict_input_data[:, 0],
+                         torch.flip(predict_input_data[:, 0], [0])]),
+            y=torch.cat([upper[:, 1], torch.flip(lower[:, 1], [0])]),
+            mode='lines',
+            line={
+                'color': 'rgba(255, 255, 255, 0)',
+            },
+            fillcolor='red',
+            opacity=0.2,
+            fill='toself',
+            name='cos confidence',
+            showlegend=True
+        )
+    )
+
+    fig.show()
 
 
 if __name__ == '__main__':
