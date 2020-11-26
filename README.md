@@ -21,6 +21,10 @@ pip install .
 
 Example usage is in `examples/regression_example.py`.
 
+For example running `python examples/gp_regression_example.py` gives:
+![gp_regression_example_plot](https://user-images.githubusercontent.com/17132214/100395061-67da4d00-300d-11eb-8ec8-6d390ad6be7e.png)
+
+
 ## Uninstall
 
 To uninstall the package:
