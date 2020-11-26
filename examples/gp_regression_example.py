@@ -123,29 +123,38 @@ def main():
                           '--auto_lr_find', 'False',
                           '--benchmark', 'True',
                           '--fast_dev_run', 'False',
-                          '--gpus', '-1',
-                          '--max_epochs', '500',
-                          '--precision', '16',
+                          # '--gpus', '-1',
+                          '--max_epochs', '50',
+                          # '--precision', '16',
                           '--terminate_on_nan', 'True',
                           '--weights_summary', 'full']
 
-    model_args_list = ['--learning_rate', '0.01']
+    model_args_list = ['--learning_rate', '0.832']
 
     args_list = program_args_list + training_args_list + model_args_list
 
     hparams = parser.parse_args(args_list)
 
     # Create data to fit
+    torch.manual_seed(3)
     samples = 100
-    input_data = torch.linspace(0, 1, samples).unsqueeze(1)
-    sin_output_data = torch.sin(input_data * (2 * math.pi)) + \
-        torch.randn(input_data.size()) * 0.2
-    cos_output_data = torch.cos(input_data * (2 * math.pi)) + \
-        torch.randn(input_data.size()) * 0.2
+    noise_scale = 0.05
+    freq = 4 * math.pi
+    x_domain = 1
+    input_data = torch.linspace(0, x_domain, samples).unsqueeze(1)
+    sin_output_data = torch.sin(input_data * freq) + \
+        torch.randn(input_data.size()) * noise_scale
+    cos_output_data = torch.cos(input_data * freq) + \
+        torch.randn(input_data.size()) * noise_scale
     sinusoidal_data = torch.cat([input_data, sin_output_data, cos_output_data],
                                 1)
     random_indices = torch.randperm(sinusoidal_data.shape[0])
     sinusoidal_data = sinusoidal_data[random_indices]
+    sinusoidal_data = sinusoidal_data[0:10]
+
+    input_data = sinusoidal_data[:, 0].unsqueeze(1)
+    sin_output_data = sinusoidal_data[:, 1].unsqueeze(1)
+    cos_output_data = sinusoidal_data[:, 2].unsqueeze(1)
 
     # Construct lightning data module for the dataset
     data_module = RandomDataModule(hparams, sinusoidal_data)
@@ -173,7 +182,7 @@ def main():
 
     # create some input data to be predicted on
     samples = 1000
-    predict_input_data = torch.linspace(0, 1, samples).unsqueeze(1)
+    predict_input_data = torch.linspace(0, x_domain, samples).unsqueeze(1)
 
     # load model
     # gotta save the train data somehow prob just need to add a custom
@@ -192,6 +201,20 @@ def main():
     # pylint: disable=import-outside-toplevel
     import plotly.graph_objects as go
     fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=predict_input_data[:, 0],
+            y=torch.sin(predict_input_data[:, 0] * freq),
+            mode='lines',
+            line={
+                'color': 'blue',
+                'dash': 'dot',
+            },
+            name='sin func',
+            showlegend=True
+        )
+    )
 
     fig.add_trace(
         go.Scatter(
@@ -226,10 +249,10 @@ def main():
             mode='lines',
             line={
                 'color': 'blue',
-                'dash': 'dot',
             },
+            opacity=0,
             name='sin upper',
-            showlegend=True
+            showlegend=False
         )
     )
 
@@ -240,10 +263,10 @@ def main():
             mode='lines',
             line={
                 'color': 'blue',
-                'dash': 'dot',
             },
+            opacity=0,
             name='sin lower',
-            showlegend=True
+            showlegend=False
         )
     )
 
@@ -260,6 +283,20 @@ def main():
             opacity=0.2,
             fill='toself',
             name='sin confidence',
+            showlegend=True
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=predict_input_data[:, 0],
+            y=torch.cos(predict_input_data[:, 0] * freq),
+            mode='lines',
+            line={
+                'color': 'red',
+                'dash': 'dot',
+            },
+            name='cos func',
             showlegend=True
         )
     )
@@ -297,10 +334,10 @@ def main():
             mode='lines',
             line={
                 'color': 'red',
-                'dash': 'dot',
             },
+            opacity=0,
             name='cos upper',
-            showlegend=True
+            showlegend=False
         )
     )
 
@@ -311,10 +348,10 @@ def main():
             mode='lines',
             line={
                 'color': 'red',
-                'dash': 'dot',
             },
+            opacity=0,
             name='cos lower',
-            showlegend=True
+            showlegend=False
         )
     )
 
