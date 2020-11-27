@@ -55,6 +55,10 @@ class RandomDataModule(lt.core.datamodule.LightningDataModule):
 
         samples = len(self.data)
 
+        # Shuffle data
+        random_indices = torch.randperm(self.data.shape[0])
+        self.data = self.data[random_indices]
+
         train_samples_idx = math.floor(train_pct * samples)
         val_samples_idx = train_samples_idx + math.floor(val_pct * samples)
 
@@ -152,10 +156,6 @@ def main():
     sinusoidal_data = sinusoidal_data[random_indices]
     sinusoidal_data = sinusoidal_data[0:10]
 
-    input_data = sinusoidal_data[:, 0].unsqueeze(1)
-    sin_output_data = sinusoidal_data[:, 1].unsqueeze(1)
-    cos_output_data = sinusoidal_data[:, 2].unsqueeze(1)
-
     # Construct lightning data module for the dataset
     data_module = RandomDataModule(hparams, sinusoidal_data)
 
@@ -219,8 +219,8 @@ def main():
 
     fig.add_trace(
         go.Scatter(
-            x=input_data[:, 0],
-            y=sin_output_data[:, 0],
+            x=data_module.train_input_data[:, 0],
+            y=data_module.train_output_data[:, 0],
             mode='markers',
             marker={
                 'size': 10,
@@ -309,8 +309,8 @@ def main():
 
     fig.add_trace(
         go.Scatter(
-            x=input_data[:, 0],
-            y=cos_output_data[:, 0],
+            x=data_module.train_input_data[:, 0],
+            y=data_module.train_output_data[:, 1],
             mode='markers',
             marker={
                 'color': 'red',
