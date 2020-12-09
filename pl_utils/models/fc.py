@@ -36,6 +36,8 @@ class FCModel(lt.core.lightning.LightningModule):
 
         self.model = torch.nn.Sequential(fc_layers)
 
+        self.example_input_array = torch.randn(1, layer_dims[0])
+
     # pylint: disable=arguments-differ
     def forward(self, input_):
         """Compute prediction."""

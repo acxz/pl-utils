@@ -159,6 +159,10 @@ def main():
     # test on data
     trainer.test(model, datamodule=data_module)
 
+    # export model
+    onnx_filepath = 'regression_example.onnx'
+    model.to_onnx(onnx_filepath, export_params=True)
+
 
 if __name__ == '__main__':
     main()
