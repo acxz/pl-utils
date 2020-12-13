@@ -11,21 +11,29 @@ import torch
 class LSTMModel(lt.core.lightning.LightningModule):
     """LSTM Network."""
 
-    def __init__(self, hparams):
+    def __init__(self, **kwargs):
         """Initialize fully connected layers."""
         super().__init__()
 
-        self.hparams = hparams
+        self.save_hyperparameters()
 
         self.lstm = torch.nn.LSTM(self.hparams.input_size,
                                   self.hparams.hidden_size,
                                   self.hparams.num_layers,
-                                  batch_first=True)
+                                  batch_first=self.hparams.batch_first)
 
     # pylint: disable=arguments-differ
     def forward(self, input_sequence, initial_hidden):
         """Compute prediction."""
         initial_hidden_state, initial_cell_state = initial_hidden
+
+        # from the batch we get <batch_dim, num_layer_dim, state_dim>, but
+        # for lstm input we need <num_layer_dim, batch_dim, state_dim>
+        # batch_first=True only applies to input not hidden/cell states
+        initial_hidden_state = \
+            initial_hidden_state.permute(1, 0, 2).contiguous()
+        initial_cell_state = initial_cell_state.permute(1, 0, 2).contiguous()
+
         output, (_, _) = self.lstm(input_sequence, (initial_hidden_state,
                                                     initial_cell_state))
         return output
@@ -93,7 +101,8 @@ class LSTMModel(lt.core.lightning.LightningModule):
             parents=[parent_parser], add_help=False)
         parser.add_argument('--input_size', type=int, required=True)
         parser.add_argument('--hidden_size', type=int, required=True)
-        parser.add_argument('--num_layers', type=int, default=1)
+        parser.add_argument('--num_layers', type=int, required=True)
+        parser.add_argument('--batch_first', type=bool, default=True)
         parser.add_argument('--learning_rate', type=float, default=1e-3)
         parser.add_argument('--momentum_param', type=int, default=0)
 

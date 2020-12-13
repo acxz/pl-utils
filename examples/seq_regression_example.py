@@ -23,13 +23,13 @@ class VectorSeqDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         """Compute length of dataset."""
-        return self.input_data.shape[1]
+        return self.input_data.shape[0]
 
     def __getitem__(self, idx):
         """Recover an item of dataset."""
-        return self.input_data[:, idx], \
-            (self.hidden_state_data[:, idx], self.cell_state_data[:, idx]), \
-            self.output_data[:, idx]
+        return self.input_data[idx], \
+            (self.hidden_state_data[idx], self.cell_state_data[idx]), \
+            self.output_data[idx]
 
 
 # pylint: disable=abstract-method
@@ -59,17 +59,17 @@ class RandomSeqDataModule(lt.core.datamodule.LightningDataModule):
 
         input_output_data = self.data[0]
         initial_hidden_data = self.data[1]
-        samples = input_output_data.shape[1]
+        samples = input_output_data.shape[0]
 
         train_samples_idx = math.floor(train_pct * samples)
         val_samples_idx = train_samples_idx + math.floor(val_pct * samples)
 
-        train_data = (input_output_data[:, 0:train_samples_idx],
-                      initial_hidden_data[:, 0:train_samples_idx])
-        val_data = (input_output_data[:, train_samples_idx:val_samples_idx],
-                    initial_hidden_data[:, train_samples_idx:val_samples_idx])
-        test_data = (input_output_data[:, val_samples_idx:None],
-                     initial_hidden_data[: val_samples_idx:None])
+        train_data = (input_output_data[0:train_samples_idx],
+                      initial_hidden_data[0:train_samples_idx])
+        val_data = (input_output_data[train_samples_idx:val_samples_idx],
+                    initial_hidden_data[train_samples_idx:val_samples_idx])
+        test_data = (input_output_data[val_samples_idx:None],
+                     initial_hidden_data[val_samples_idx:None])
 
         train_input_data, train_output_data = \
             self._split_input_output_data(train_data[0])
@@ -153,46 +153,48 @@ def main():
     # Add model specific args from model
     parser = plu.models.lstm.LSTMModel.add_model_specific_args(parser)
 
-    program_args_list = ['--batch_size', '1',
+    program_args_list = ['--batch_size', '2',
                          '--data_num_workers', '4']
 
     training_args_list = ['--accumulate_grad_batches', '1',
                           '--auto_lr_find', 'False',
                           '--auto_scale_batch_size', 'False',
                           '--benchmark', 'True',
-                          '--fast_dev_run', 'False',
-                          # '--gpus', '-1',
-                          # '--precision', '16',
+                          '--fast_dev_run', '0',
+                          '--gpus', '-1',
+                          '--precision', '16',
                           '--terminate_on_nan', 'True',
                           '--weights_summary', 'full']
 
     model_args_list = ['--input_size', '3',
                        '--hidden_size', '4',
-                       '--num_layers', '1',
+                       '--num_layers', '3',
                        '--learning_rate', '0.002']
 
     args_list = program_args_list + training_args_list + model_args_list
 
-    hparams = parser.parse_args(args_list)
+    hparams_args = parser.parse_args(args_list)
+    hparams = vars(hparams_args)
 
     # Create random data to fit a fully connected network
-    sequence_dim = 2
-    samples = 10
+    sequence_dim = 5
+    samples = 20
     input_dim = 3
     hidden_dim = 4
-    num_layers = 1
-    random_seq_data = (torch.rand(sequence_dim, samples,
+    num_layers = 3
+    # Want to change this make samples up front
+    random_seq_data = (torch.rand(samples, sequence_dim,
                                   input_dim + hidden_dim),
-                       torch.rand(num_layers, samples, hidden_dim * 2))
+                       torch.rand(samples, num_layers, hidden_dim * 2))
 
     # Construct lightning data module for the dataset
-    data_module = RandomSeqDataModule(hparams, random_seq_data)
+    data_module = RandomSeqDataModule(hparams_args, random_seq_data)
 
     # create model
-    model = plu.models.lstm.LSTMModel(hparams)
+    model = plu.models.lstm.LSTMModel(**hparams)
 
     # create trainer
-    trainer = lt.Trainer.from_argparse_args(hparams)
+    trainer = lt.Trainer.from_argparse_args(hparams_args)
 
     # tune trainer
     trainer.tune(model, datamodule=data_module)
