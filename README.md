@@ -1,6 +1,5 @@
 # pl-utils
 
-TODO
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3579627.svg)](https://doi.org/10.5281/zenodo.3579627)
 
 Some models and trainer scripts created using pytorch-lightning.
@@ -19,9 +18,10 @@ pip install .
 
 ## Usage
 
-Example usage is in `examples/regression_example.py`.
+Example usage is in `examples/`.
 
-For example running `python examples/gp_regression_example.py` gives:
+For example running `python examples/gp_regression_example.py` and then
+`python examples/gp_visualization.py` gives:
 ![gp_regression_example_plot](https://user-images.githubusercontent.com/17132214/100395061-67da4d00-300d-11eb-8ec8-6d390ad6be7e.png)
 
 
