@@ -123,13 +123,12 @@ def main():
 
     program_args_list = ['--data_num_workers', '4']
 
-    training_args_list = ['--accumulate_grad_batches', '1',
-                          '--auto_lr_find', 'False',
+    training_args_list = ['--auto_lr_find', 'False',
                           '--benchmark', 'True',
-                          '--fast_dev_run', 'False',
-                          # '--gpus', '-1',
+                          '--fast_dev_run', '0',
+                          '--gpus', '-1',
+                          '--logger', 'False',  # pytorch-lightning/#4496
                           '--max_epochs', '50',
-                          # '--precision', '16',
                           '--terminate_on_nan', 'True',
                           '--weights_summary', 'full']
 
@@ -137,7 +136,8 @@ def main():
 
     args_list = program_args_list + training_args_list + model_args_list
 
-    hparams = parser.parse_args(args_list)
+    hparams_args = parser.parse_args(args_list)
+    hparams = vars(hparams_args)
 
     # Create data to fit
     torch.manual_seed(3)
@@ -157,7 +157,7 @@ def main():
     sinusoidal_data = sinusoidal_data[0:10]
 
     # Construct lightning data module for the dataset
-    data_module = RandomDataModule(hparams, sinusoidal_data)
+    data_module = RandomDataModule(hparams_args, sinusoidal_data)
 
     # GP data preprocessing since it needs train_input_data, train_output_data
     # during initialization which also need to be the same ones used in
@@ -165,11 +165,12 @@ def main():
     data_module.setup()
 
     # create model
-    model = plu.models.gp.BIMOEGPModel(hparams, data_module.train_input_data,
-                                       data_module.train_output_data)
+    model = plu.models.gp.BIMOEGPModel(data_module.train_input_data,
+                                       data_module.train_output_data,
+                                       **hparams)
 
     # create trainer
-    trainer = lt.Trainer.from_argparse_args(hparams)
+    trainer = lt.Trainer.from_argparse_args(hparams_args)
 
     # tune trainer
     trainer.tune(model, datamodule=data_module)
@@ -183,6 +184,7 @@ def main():
     # create some input data to be predicted on
     samples = 1000
     predict_input_data = torch.linspace(0, x_domain, samples).unsqueeze(1)
+    predict_input_data = predict_input_data.cuda()
 
     # load model
     # gotta save the train data somehow prob just need to add a custom
@@ -196,6 +198,12 @@ def main():
         predictions = model.likelihood(model(predict_input_data))
         mean = predictions.mean
         lower, upper = predictions.confidence_region()
+
+    # move over data to the cpu for plotting
+    predict_input_data = predict_input_data.cpu()
+    mean = mean.cpu()
+    lower = lower.cpu()
+    upper = upper.cpu()
 
     # plots
     # pylint: disable=import-outside-toplevel

@@ -41,11 +41,11 @@ class BIMOEGP(gpytorch.models.ExactGP):
 class BIMOEGPModel(lt.core.lightning.LightningModule):
     """batch independent multioutput exact gp model."""
 
-    def __init__(self, hparams, train_input_data, train_output_data):
+    def __init__(self, train_input_data, train_output_data, **kwargs):
         """Initialize gp model with mean and covar."""
         super().__init__()
 
-        self.hparams = hparams
+        self.save_hyperparameters()
 
         output_dim = train_output_data.shape[1]
         self.likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(
