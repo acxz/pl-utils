@@ -47,11 +47,12 @@ class BIMOEGPModel(lt.core.lightning.LightningModule):
 
         self.save_hyperparameters()
 
-        output_dim = train_output_data.shape[1]
+        output_dim = self.hparams.train_output_data.shape[1]
         self.likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(
             num_tasks=output_dim)
 
-        self.bimoegp = BIMOEGP(train_input_data, train_output_data,
+        self.bimoegp = BIMOEGP(self.hparams.train_input_data,
+                               self.hparams.train_output_data,
                                self.likelihood)
 
         self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(
@@ -83,35 +84,33 @@ class BIMOEGPModel(lt.core.lightning.LightningModule):
     # pylint: disable=unused-argument
     def validation_step(self, batch, batch_idx):
         """Compute validation loss."""
-        # input_, target = batch
-        # output = self(input_)
+        input_, target = batch
+        output = self(input_)
 
-        # loss = -self.mll(output, target)
+        loss = -self.mll(output, target)
 
-        # return {'val_loss': loss}
-        return 0
+        return {'val_loss': loss}
 
     # pylint: disable=no-self-use
     def validation_epoch_end(self, outputs):
         """Record validation loss."""
-        # avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        # self.log('avg_val_loss', avg_loss)
+        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
+        self.log('avg_val_loss', avg_loss)
 
     # pylint: disable=unused-argument
     def test_step(self, batch, batch_idx):
         """Compute testing loss."""
-        # input_, target = batch
-        # output = self(input_)
+        input_, target = batch
+        output = self(input_)
 
-        # loss = -self.mll(output, target)
+        loss = -self.mll(output, target)
 
-        # return {'test_loss': loss}
-        return 0
+        return {'test_loss': loss}
 
     def test_epoch_end(self, outputs):
         """Record average test loss."""
-        # avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
-        # self.log('avg_test_loss', avg_loss)
+        avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
+        self.log('avg_test_loss', avg_loss)
 
     @ staticmethod
     def add_model_specific_args(parent_parser):

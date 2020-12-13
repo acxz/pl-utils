@@ -184,13 +184,10 @@ def main():
     # create some input data to be predicted on
     samples = 1000
     predict_input_data = torch.linspace(0, x_domain, samples).unsqueeze(1)
-    predict_input_data = predict_input_data.cuda()
 
     # load model
-    # gotta save the train data somehow prob just need to add a custom
-    # checkpoint callback
-    # checkpoint_path = 'lightning_logs/version_40/checkpoints/epoch=999.ckpt'
-    # model = plu.models.gp.BIMOEGPModel.load_from_checkpoint(checkpoint_path)
+    checkpoint_path = 'checkpoints/epoch=49-step=49.ckpt'
+    model = plu.models.gp.BIMOEGPModel.load_from_checkpoint(checkpoint_path)
 
     # predict on mode
     model.eval()
@@ -198,12 +195,6 @@ def main():
         predictions = model.likelihood(model(predict_input_data))
         mean = predictions.mean
         lower, upper = predictions.confidence_region()
-
-    # move over data to the cpu for plotting
-    predict_input_data = predict_input_data.cpu()
-    mean = mean.cpu()
-    lower = lower.cpu()
-    upper = upper.cpu()
 
     # plots
     # pylint: disable=import-outside-toplevel
