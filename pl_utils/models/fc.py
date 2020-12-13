@@ -12,11 +12,11 @@ import torch
 class FCModel(lt.core.lightning.LightningModule):
     """FC Network."""
 
-    def __init__(self, hparams):
+    def __init__(self, **kwargs):
         """Initialize fully connected layers."""
         super().__init__()
 
-        self.hparams = hparams
+        self.save_hyperparameters()
 
         layer_dims_list_str = self.hparams.layer_dims.split()
         layer_dims = [int(layer_dim)

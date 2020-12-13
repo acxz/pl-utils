@@ -122,7 +122,7 @@ def main():
                           '--auto_lr_find', 'False',
                           '--auto_scale_batch_size', 'False',
                           '--benchmark', 'True',
-                          '--fast_dev_run', 'False',
+                          '--fast_dev_run', '0',
                           '--gpus', '-1',
                           '--precision', '16',
                           '--terminate_on_nan', 'True',
@@ -133,7 +133,8 @@ def main():
 
     args_list = program_args_list + training_args_list + model_args_list
 
-    hparams = parser.parse_args(args_list)
+    hparams_args = parser.parse_args(args_list)
+    hparams = vars(hparams_args)
 
     # Create random data to fit a fully connected network
     samples = 8000
@@ -142,13 +143,13 @@ def main():
     random_data = torch.rand(samples, input_dim + output_dim)
 
     # Construct lightning data module for the dataset
-    data_module = RandomDataModule(hparams, random_data)
+    data_module = RandomDataModule(hparams_args, random_data)
 
     # create model
-    model = plu.models.fc.FCModel(hparams)
+    model = plu.models.fc.FCModel(**hparams)
 
     # create trainer
-    trainer = lt.Trainer.from_argparse_args(hparams)
+    trainer = lt.Trainer.from_argparse_args(hparams_args)
 
     # tune trainer
     trainer.tune(model, datamodule=data_module)
