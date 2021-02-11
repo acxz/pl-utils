@@ -124,6 +124,7 @@ def main():
                           '--benchmark', 'True',
                           '--fast_dev_run', '0',
                           '--gpus', '-1',
+                          '--max_epochs', '100',
                           '--precision', '16',
                           '--terminate_on_nan', 'True',
                           '--weights_summary', 'full']
@@ -162,7 +163,9 @@ def main():
 
     # export model
     onnx_filepath = 'regression_example.onnx'
-    model.to_onnx(onnx_filepath, export_params=True)
+    test_batch_size = 5
+    example_input_sample = torch.randn(test_batch_size, input_dim)
+    model.to_onnx(onnx_filepath, example_input_sample, export_params=True)
 
 
 if __name__ == '__main__':
