@@ -35,7 +35,7 @@ class RandomDataModule(lt.core.datamodule.LightningDataModule):
     def __init__(self, hparams, data):
         """Initialze variables."""
         super().__init__()
-        self.hparams = hparams
+        self.save_hyperparameters(hparams)
 
         self.data = data
 
@@ -95,7 +95,7 @@ class RandomDataModule(lt.core.datamodule.LightningDataModule):
 
     @staticmethod
     def _split_input_output_data(data):
-        input_dim = 3
+        input_dim = 1
         input_data = data[:, 0:input_dim]
         output_data = data[:, input_dim:None]
         return input_data, output_data
@@ -118,18 +118,21 @@ def main():
     program_args_list = ['--batch_size', '8000',
                          '--data_num_workers', '4']
 
-    training_args_list = ['--accumulate_grad_batches', '1',
+    training_args_list = ['--accelerator', 'cpu',
+                          '--accumulate_grad_batches', '1',
                           '--auto_lr_find', 'False',
-                          '--auto_scale_batch_size', 'False',
+                          '--auto_scale_batch_size', 'True',
                           '--benchmark', 'True',
-                          '--fast_dev_run', '0',
-                          '--gpus', '-1',
+                          '--detect_anomaly', 'True',
+                          '--enable_checkpointing', 'True',
+                          '--enable_model_summary', 'True',
+                          '--enable_progress_bar', 'True',
+                          '--fast_dev_run', 'False',
                           '--max_epochs', '100',
-                          '--precision', '16',
-                          '--terminate_on_nan', 'True',
+                          '--precision', 'bf16',
                           '--weights_summary', 'full']
 
-    model_args_list = ['--layer_dims', '3 32 32 4',
+    model_args_list = ['--layer_dims', '1 32 32 3',
                        '--learning_rate', '0.002']
 
     args_list = program_args_list + training_args_list + model_args_list
@@ -137,14 +140,21 @@ def main():
     hparams_args = parser.parse_args(args_list)
     hparams = vars(hparams_args)
 
-    # Create random data to fit a fully connected network
-    samples = 8000
-    input_dim = 3
-    output_dim = 4
-    random_data = torch.rand(samples, input_dim + output_dim)
+    # Create data to fit a fully connected network
+    samples = 100000
+    input_dim = 1
+    output_dim = 3
+    data = torch.empty(samples, input_dim + output_dim)
+
+    time = torch.linspace(1, 5.7, samples)
+    for sample_idx in range(samples):
+        data[sample_idx] = torch.Tensor([time[sample_idx],
+            torch.cos(2 * torch.pi * time[sample_idx]),
+            torch.sin(2 * torch.pi * time[sample_idx]),
+            time[sample_idx]])
 
     # Construct lightning data module for the dataset
-    data_module = RandomDataModule(hparams_args, random_data)
+    data_module = RandomDataModule(hparams_args, data)
 
     # create model
     model = plu.models.fc.FCModel(**hparams)
@@ -162,8 +172,8 @@ def main():
     trainer.test(model, datamodule=data_module)
 
     # export model
-    onnx_filepath = 'regression_example.onnx'
-    test_batch_size = 5
+    onnx_filepath = 'fc_example.onnx'
+    test_batch_size = 1
     example_input_sample = torch.randn(test_batch_size, input_dim)
     model.to_onnx(onnx_filepath, example_input_sample, export_params=True)
 
