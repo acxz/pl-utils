@@ -27,7 +27,7 @@ class FCModel(lt.core.lightning.LightningModule):
             fc_layers['linear' + str(layer_idx + 1)] = \
                 torch.nn.Linear(layer_dims[layer_idx],
                                 layer_dims[layer_idx + 1])
-            fc_layers['selu' + str(layer_idx + 1)] = torch.nn.SELU()
+            fc_layers['silu' + str(layer_idx + 1)] = torch.nn.SiLU()
 
         layer_idx = len(layer_dims) - 2
         fc_layers['linear' + str(layer_idx + 1)] = \
