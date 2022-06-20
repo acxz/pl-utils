@@ -40,7 +40,7 @@ class RandomSeqDataModule(lt.core.datamodule.LightningDataModule):
     def __init__(self, hparams, data):
         """Initialze variables."""
         super().__init__()
-        self.hparams = hparams
+        self.save_hyperparameters(hparams)
 
         self.data = data
 
@@ -156,14 +156,18 @@ def main():
     program_args_list = ['--batch_size', '2',
                          '--data_num_workers', '4']
 
-    training_args_list = ['--accumulate_grad_batches', '1',
+    training_args_list = ['--accelerator', 'cpu',
+                          '--accumulate_grad_batches', '1',
                           '--auto_lr_find', 'False',
-                          '--auto_scale_batch_size', 'False',
+                          '--auto_scale_batch_size', 'True',
                           '--benchmark', 'True',
-                          '--fast_dev_run', '0',
-                          '--gpus', '-1',
-                          '--precision', '16',
-                          '--terminate_on_nan', 'True',
+                          '--detect_anomaly', 'True',
+                          '--enable_checkpointing', 'True',
+                          '--enable_model_summary', 'True',
+                          '--enable_progress_bar', 'True',
+                          '--fast_dev_run', 'False',
+                          '--max_epochs', '100',
+                          '--precision', 'bf16',
                           '--weights_summary', 'full']
 
     model_args_list = ['--input_size', '3',
@@ -183,12 +187,12 @@ def main():
     hidden_dim = 4
     num_layers = 3
     # Want to change this make samples up front
-    random_seq_data = (torch.rand(samples, sequence_dim,
+    seq_data = (torch.rand(samples, sequence_dim,
                                   input_dim + hidden_dim),
                        torch.rand(samples, num_layers, hidden_dim * 2))
 
     # Construct lightning data module for the dataset
-    data_module = RandomSeqDataModule(hparams_args, random_seq_data)
+    data_module = RandomSeqDataModule(hparams_args, seq_data)
 
     # create model
     model = plu.models.lstm.LSTMModel(**hparams)
