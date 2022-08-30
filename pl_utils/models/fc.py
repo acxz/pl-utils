@@ -3,13 +3,13 @@
 import argparse
 from collections import OrderedDict
 
-import pytorch_lightning as lt
+import pytorch_lightning as pl
 
 import torch
 
 
 # pylint: disable=too-many-ancestors
-class FCModel(lt.core.lightning.LightningModule):
+class FCModel(pl.LightningModule):
     """FC Network."""
 
     def __init__(self, **kwargs):
@@ -53,10 +53,9 @@ class FCModel(lt.core.lightning.LightningModule):
 
     def configure_optimizers(self):
         """Create optimizer."""
-        optimizer = torch.optim.RMSprop(
+        optimizer = torch.optim.Adam(
             self.parameters(),
-            lr=self.hparams.learning_rate,
-            momentum=self.hparams.momentum_param)
+            lr=self.hparams.learning_rate)
 
         return optimizer
 

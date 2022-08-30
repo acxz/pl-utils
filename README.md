@@ -20,7 +20,11 @@ pip install .
 
 Example usage is in `examples/`.
 
-For example running `python examples/gp_regression_example.py` and then
+Running `python examples/fc_example.py` and then
+`python examples/fc_visualization.py` gives:
+![mlp_regression_example_plot](https://user-images.githubusercontent.com/17132214/187483104-9a368126-db4a-4304-ba9e-204e2dc059de.png)
+
+Running `python examples/gp_regression_example.py` and then
 `python examples/gp_visualization.py` gives:
 ![gp_regression_example_plot](https://user-images.githubusercontent.com/17132214/100395061-67da4d00-300d-11eb-8ec8-6d390ad6be7e.png)
 
