@@ -1,14 +1,15 @@
 """LSTM Model."""
 
 import argparse
+import ast
 
-import pytorch_lightning as lt
+import pytorch_lightning as pl
 
 import torch
 
 
 # pylint: disable=too-many-ancestors
-class LSTMModel(lt.core.lightning.LightningModule):
+class LSTMModel(pl.LightningModule):
     """LSTM Network."""
 
     def __init__(self, **kwargs):
@@ -20,58 +21,61 @@ class LSTMModel(lt.core.lightning.LightningModule):
         self.lstm = torch.nn.LSTM(self.hparams.input_size,
                                   self.hparams.hidden_size,
                                   self.hparams.num_layers,
-                                  batch_first=self.hparams.batch_first)
+                                  self.hparams.bias,
+                                  self.hparams.batch_first,
+                                  self.hparams.dropout,
+                                  self.hparams.bidirectional,
+                                  self.hparams.proj_size)
 
     # pylint: disable=arguments-differ
-    def forward(self, input_sequence, initial_hidden):
+    def forward(self, input_sequence, input_hidden_cell):
         """Compute prediction."""
-        initial_hidden_state, initial_cell_state = initial_hidden
+        input_hidden, input_cell = input_hidden_cell
 
-        # from the batch we get <batch_dim, num_layer_dim, state_dim>, but
-        # for lstm input we need <num_layer_dim, batch_dim, state_dim>
-        # batch_first=True only applies to input not hidden/cell states
-        initial_hidden_state = \
-            initial_hidden_state.permute(1, 0, 2).contiguous()
-        initial_cell_state = initial_cell_state.permute(1, 0, 2).contiguous()
+        # TODO: Can permuting be done at dataloader level to speed forward call
+        # How to ensure we are getting the right batch dimensions stuff?
 
-        output, (_, _) = self.lstm(input_sequence, (initial_hidden_state,
-                                                    initial_cell_state))
-        return output
+        # Restructure batch data to fit lstm model
+        # input_sequence: we have [batch_dim, sequence_dim, input_dim], but
+        # if self.hparams.batch_first
+        # we need [batch_dim, sequence_dim, input_dim]
+        # so do nothing
+        # else
+        # we need [sequence_dim, batch_dim, input_dim]
+        if not self.hparams.batch_first:
+            input_sequence = input_sequence.permute(1, 0, 2)
+
+        # hidden/cell: we get [batch_dim, num_layer * d, hidden_dim], but
+        # for lstm input we need [num_layer * d, batch_dim, hidden_dim]
+        # batch_first=True only applies to input_sequence not hidden/cell
+        input_hidden = input_hidden.permute(1, 0, 2).contiguous()
+        input_cell = input_cell.permute(1, 0, 2).contiguous()
+
+        output_sequence, (output_hidden, output_cell) = self.lstm(
+            input_sequence, (input_hidden, input_cell))
+
+        return output_sequence, (output_hidden, output_cell)
 
     # pylint: disable=unused-argument
     def training_step(self, batch, batch_idx):
         """Compute training loss."""
-        input_sequence, (initial_hidden_state, initial_cell_state), target \
-            = batch
-        output = self(input_sequence, (initial_hidden_state,
-                                       initial_cell_state))
-
-        loss = torch.nn.functional.mse_loss(output, target)
-
+        loss = self.compute_loss(batch)
         return {'loss': loss}
 
     def configure_optimizers(self):
         """Create optimizer."""
-        optimizer = torch.optim.RMSprop(
+        optimizer = torch.optim.Adam(
             self.parameters(),
-            lr=self.hparams.learning_rate,
-            momentum=self.hparams.momentum_param)
+            lr=self.hparams.learning_rate)
 
         return optimizer
 
     # pylint: disable=unused-argument
     def validation_step(self, batch, batch_idx):
         """Compute validation loss."""
-        input_sequence, (initial_hidden_state, initial_cell_state), target \
-            = batch
-        output = self(input_sequence, (initial_hidden_state,
-                                       initial_cell_state))
-
-        loss = torch.nn.functional.mse_loss(output, target)
-
+        loss = self.compute_loss(batch)
         return {'val_loss': loss}
 
-    # pylint: disable=no-self-use
     def validation_epoch_end(self, outputs):
         """Record validation loss."""
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
@@ -80,19 +84,36 @@ class LSTMModel(lt.core.lightning.LightningModule):
     # pylint: disable=unused-argument
     def test_step(self, batch, batch_idx):
         """Compute testing loss."""
-        input_sequence, (initial_hidden_state, initial_cell_state), target \
-            = batch
-        output = self(input_sequence, (initial_hidden_state,
-                                       initial_cell_state))
-
-        loss = torch.nn.functional.mse_loss(output, target)
-
+        loss = self.compute_loss(batch)
         return {'test_loss': loss}
 
     def test_epoch_end(self, outputs):
         """Record average test loss."""
         avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
         self.log('avg_test_loss', avg_loss)
+
+    def compute_loss(self, batch):
+        """Compute loss of batch."""
+        input_sequence, (input_hidden, input_cell), \
+            target_sequence, (target_hidden, target_cell) = batch
+
+        output_sequence, (output_hidden, output_cell) = self(input_sequence,
+                                                             (input_hidden,
+                                                              input_cell))
+
+        # input_sequence/hidden/cell is permuted inside of the forward call
+        target_hidden = target_hidden.permute(1, 0, 2).contiguous()
+        target_cell = target_cell.permute(1, 0, 2).contiguous()
+
+        sequence_loss = torch.nn.functional.mse_loss(output_sequence,
+                                                     target_sequence)
+        hidden_loss = torch.nn.functional.mse_loss(output_hidden,
+                                                   target_hidden)
+        cell_loss = torch.nn.functional.mse_loss(output_cell, target_cell)
+
+        loss = sequence_loss + hidden_loss + cell_loss
+
+        return loss
 
     @ staticmethod
     def add_model_specific_args(parent_parser):
@@ -101,9 +122,14 @@ class LSTMModel(lt.core.lightning.LightningModule):
             parents=[parent_parser], add_help=False)
         parser.add_argument('--input_size', type=int, required=True)
         parser.add_argument('--hidden_size', type=int, required=True)
-        parser.add_argument('--num_layers', type=int, required=True)
-        parser.add_argument('--batch_first', type=bool, default=True)
+        parser.add_argument('--num_layers', type=int, default=1)
+        parser.add_argument('--bias', type=ast.literal_eval, default=True)
+        parser.add_argument('--batch_first', type=ast.literal_eval,
+                            default=False)
+        parser.add_argument('--dropout', type=float, default=0)
+        parser.add_argument('--bidirectional', type=ast.literal_eval,
+                            default=False)
+        parser.add_argument('--proj_size', type=int, default=0)
         parser.add_argument('--learning_rate', type=float, default=1e-3)
-        parser.add_argument('--momentum_param', type=int, default=0)
 
         return parser
