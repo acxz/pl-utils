@@ -3,9 +3,11 @@
 import argparse
 import math
 
+import gpytorch
+
 import pl_utils as plu
 
-import pytorch_lightning as lt
+import pytorch_lightning as pl
 
 import torch
 
@@ -29,74 +31,65 @@ class VectorDataset(torch.utils.data.Dataset):
 
 # pylint: disable=abstract-method
 # pylint: disable=too-many-instance-attributes
-class RandomDataModule(lt.core.datamodule.LightningDataModule):
+class VectorDataModule(pl.core.datamodule.LightningDataModule):
     """Data module to load train/val/test dataloaders."""
 
     def __init__(self, hparams, data):
         """Initialze variables."""
         super().__init__()
-        self.hparams = hparams
+        self.save_hyperparameters(hparams)
+
+        # flag to ensure setup (i.e. random split) only happens once
+        self.has_setup = False
 
         self.data = data
-        # For GPs the batch_size must be the entire dataset
-        self.batch_size = len(self.data)
 
-        self.train_input_data = None
-        self.train_output_data = None
-        self.val_input_data = None
-        self.val_output_data = None
-        self.test_input_data = None
-        self.test_output_data = None
+        self.train_dataset = None
+        self.val_dataset = None
+        self.test_dataset = None
 
     def setup(self, stage=None):
         """Create and assign splits."""
+        if self.has_setup:
+            return
+        self.has_setup = True
+
         train_pct = 0.8
-        val_pct = 0.1
+        test_pct = 0.1
 
         samples = len(self.data)
 
-        # Shuffle data
-        random_indices = torch.randperm(self.data.shape[0])
-        self.data = self.data[random_indices]
+        train_samples = int(train_pct * samples)
+        test_samples = int(test_pct * samples)
+        val_samples = samples - train_samples - test_samples
 
-        train_samples_idx = math.floor(train_pct * samples)
-        val_samples_idx = train_samples_idx + math.floor(val_pct * samples)
-
-        train_data = self.data[0:train_samples_idx]
-        val_data = self.data[train_samples_idx:val_samples_idx]
-        test_data = self.data[val_samples_idx:None]
-
-        self.train_input_data, self.train_output_data = \
-            self._split_input_output_data(train_data)
-        self.val_input_data, self.val_output_data = \
-            self._split_input_output_data(val_data)
-        self.test_input_data, self.test_output_data = \
-            self._split_input_output_data(test_data)
+        input_data, output_data = self._split_input_output_data(self.data)
+        vector_dataset = VectorDataset(input_data, output_data)
+        self.train_dataset, self.val_dataset, self.test_dataset = \
+            torch.utils.data.random_split(
+                vector_dataset, [train_samples, val_samples, test_samples])
 
     def train_dataloader(self, *args, **kwargs):
         """Create train dataloader."""
-        train_split = VectorDataset(self.train_input_data,
-                                    self.train_output_data)
         return torch.utils.data.DataLoader(
-            dataset=train_split,
+            dataset=self.train_dataset,
             num_workers=self.hparams.data_num_workers,
-            batch_size=self.batch_size)
+            # batch size must be the training dataset for GPs
+            batch_size=len(self.train_dataset))
 
     def val_dataloader(self, *args, **kwargs):
         """Create val dataloader."""
-        val_split = VectorDataset(self.val_input_data, self.val_output_data)
         return torch.utils.data.DataLoader(
-            dataset=val_split,
+            dataset=self.val_dataset,
             num_workers=self.hparams.data_num_workers,
-            batch_size=self.batch_size)
+            batch_size=self.hparams.eval_batch_size)
 
     def test_dataloader(self, *args, **kwargs):
         """Create test dataloader."""
-        test_split = VectorDataset(self.test_input_data, self.test_output_data)
         return torch.utils.data.DataLoader(
-            dataset=test_split,
+            dataset=self.test_dataset,
             num_workers=self.hparams.data_num_workers,
-            batch_size=self.batch_size)
+            batch_size=self.hparams.eval_batch_size)
 
     @staticmethod
     def _split_input_output_data(data):
@@ -106,31 +99,34 @@ class RandomDataModule(lt.core.datamodule.LightningDataModule):
         return input_data, output_data
 
 
-# pylint: disable=too-many-statements
 # pylint: disable=too-many-locals
 def main():
     """Initialize model and trainer to fit."""
     parser = argparse.ArgumentParser()
 
     # Add program specific args from model
+    parser.add_argument('--eval_batch_size', type=int, default=1)
     parser.add_argument('--data_num_workers', type=int, default=1)
 
     # Add trainer specific args from model
-    parser = lt.Trainer.add_argparse_args(parser)
+    parser = pl.Trainer.add_argparse_args(parser)
 
     # Add model specific args from model
     parser = plu.models.gp.BIMOEGPModel.add_model_specific_args(parser)
 
-    program_args_list = ['--data_num_workers', '4']
+    program_args_list = ['--eval_batch_size', '1',
+                         '--data_num_workers', '4']
 
-    training_args_list = ['--auto_lr_find', 'False',
+    training_args_list = ['--accelerator', 'auto',
+                          '--accumulate_grad_batches', '1',
+                          '--auto_lr_find', 'False',
                           '--benchmark', 'True',
-                          '--fast_dev_run', '0',
-                          '--gpus', '-1',
-                          '--logger', 'False',  # pytorch-lightning/#4496
+                          '--enable_checkpointing', 'True',
+                          '--detect_anomaly', 'True',
+                          '--fast_dev_run', 'False',
+                          '--enable_progress_bar', 'True',
                           '--max_epochs', '50',
-                          '--terminate_on_nan', 'True',
-                          '--weights_summary', 'full']
+                          '--enable_model_summary', 'True']
 
     model_args_list = ['--learning_rate', '0.832']
 
@@ -157,29 +153,53 @@ def main():
     sinusoidal_data = sinusoidal_data[0:10]
 
     # Construct lightning data module for the dataset
-    data_module = RandomDataModule(hparams_args, sinusoidal_data)
+    data_module = VectorDataModule(hparams_args, sinusoidal_data)
 
-    # GP data preprocessing since it needs train_input_data, train_output_data
-    # during initialization which also need to be the same ones used in
-    # training
+    # setup data module manually since it needs train_input/output_data during
+    # initialization, which also need to be the same ones used in training
     data_module.setup()
+    train_input_data, train_output_data = data_module.train_dataset[:]
 
     # create model
-    model = plu.models.gp.BIMOEGPModel(data_module.train_input_data,
-                                       data_module.train_output_data,
+    model = plu.models.gp.BIMOEGPModel(train_input_data,
+                                       train_output_data,
                                        **hparams)
 
     # create trainer
-    trainer = lt.Trainer.from_argparse_args(hparams_args)
-
-    # tune trainer
-    trainer.tune(model, datamodule=data_module)
+    trainer = pl.Trainer.from_argparse_args(hparams_args)
 
     # train on data
     trainer.fit(model, datamodule=data_module)
 
     # test on data
     trainer.test(model, datamodule=data_module)
+
+    # export model
+    pt_filepath = 'gp_regression_example.pt'
+    torch.save({'model_state_dict': model.state_dict(),
+                'train_input_data': train_input_data,
+                'train_output_data': train_output_data},
+               pt_filepath)
+
+    # export model in onnx
+    # below does not work yet
+    # onnx_filepath = 'gp_regression_example.onnx'
+    # onnx_batch_size = 1
+    # input_dim = 1
+    # input_sample = torch.randn((onnx_batch_size, input_dim))
+
+    # model.to_onnx(onnx_filepath, input_sample, export_params=True)
+
+    # with torch.no_grad(), gpytorch.settings.fast_pred_var(), \
+    #        gpytorch.settings.trace_mode():
+    #    model.eval()
+    #    model(input_sample)  # Do precomputation
+
+    #    traced_model = torch.jit.trace(
+    #        plu.models.gp.MeanVarModelWrapper(model), input_sample)
+
+    # traced_model = torch.jit.onnx(onnx_filepath, input_sample,
+    #                          export_params=True)
 
 
 if __name__ == '__main__':

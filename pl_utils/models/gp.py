@@ -4,7 +4,7 @@ import argparse
 
 import gpytorch
 
-import pytorch_lightning as lt
+import pytorch_lightning as pl
 
 import torch
 
@@ -16,7 +16,7 @@ class BIMOEGP(gpytorch.models.ExactGP):
         """Initialize gp model with mean and covar."""
         super().__init__(train_input_data, train_output_data, likelihood)
 
-        output_dim = train_output_data.shape[1]
+        output_dim = train_output_data.size(dim=1)
         output_dim_torch = torch.Size([output_dim])
 
         self.mean_module = \
@@ -25,6 +25,10 @@ class BIMOEGP(gpytorch.models.ExactGP):
         self.covar_module = gpytorch.kernels.ScaleKernel(
             gpytorch.kernels.RBFKernel(batch_shape=output_dim_torch),
             batch_shape=output_dim_torch)
+
+        # Receiving error when using jit:
+        # RuntimeError: mean shape torch.Size([9, 2]) is incompatible with covariance shape torch.Size([144, 144])
+        # Something wrong with prediction stage
 
     # pylint: disable=arguments-differ
     def forward(self, input_):
@@ -37,8 +41,22 @@ class BIMOEGP(gpytorch.models.ExactGP):
                 gpytorch.distributions.MultivariateNormal(mean, covar))
 
 
+class MeanVarModelWrapper(torch.nn.Module):
+    """Wrapper class to output prediction model."""
+
+    def __init__(self, gp):
+        """Initialize gp."""
+        super().__init__()
+        self.gp = gp
+
+    def forward(self, input_):
+        """Compute prediction."""
+        output_dist = self.gp(input_)
+        return output_dist.mean, output_dist.variance
+
+
 # pylint: disable=too-many-ancestors
-class BIMOEGPModel(lt.core.lightning.LightningModule):
+class BIMOEGPModel(pl.LightningModule):
     """batch independent multioutput exact gp model."""
 
     def __init__(self, train_input_data, train_output_data, **kwargs):

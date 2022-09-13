@@ -14,8 +14,13 @@ def main():
     predict_input_data = torch.linspace(0, x_domain, samples).unsqueeze(1)
 
     # load model
-    checkpoint_path = 'checkpoints/epoch=49-step=49.ckpt'
-    model = plu.models.gp.BIMOEGPModel.load_from_checkpoint(checkpoint_path)
+    pt_path = 'gp_regression_example.pt'
+    checkpoint = torch.load(pt_path)
+    model_state_dict = checkpoint['model_state_dict']
+    train_input_data = checkpoint['train_input_data']
+    train_output_data = checkpoint['train_output_data']
+    model = plu.models.gp.BIMOEGPModel(train_input_data, train_output_data)
+    model.load_state_dict(model_state_dict)
 
     # predict on mode
     model.eval()
@@ -198,7 +203,6 @@ def main():
         )
     )
 
-
     fig.add_trace(
         go.Scatter(
             x=predict_input_data[:, 0],
@@ -286,6 +290,7 @@ def main():
     )
 
     fig.show()
+
 
 if __name__ == '__main__':
     main()
