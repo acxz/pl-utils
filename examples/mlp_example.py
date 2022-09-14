@@ -92,7 +92,7 @@ class VectorDataModule(pl.core.datamodule.LightningDataModule):
 
 # pylint: disable=too-many-locals
 def main():
-    """Initialize model and trainer to fit a fc net."""
+    """Initialize model and trainer to fit a mlp net."""
     parser = argparse.ArgumentParser()
 
     # Add program specific args from model
@@ -103,7 +103,7 @@ def main():
     parser = pl.Trainer.add_argparse_args(parser)
 
     # Add model specific args from model
-    parser = plu.models.fc.FCModel.add_model_specific_args(parser)
+    parser = plu.models.mlp.MLPModel.add_model_specific_args(parser)
 
     program_args_list = ['--batch_size', '8000',
                          '--data_num_workers', '4']
@@ -148,7 +148,7 @@ def main():
     data_module = VectorDataModule(hparams_args, data)
 
     # create model
-    model = plu.models.fc.FCModel(**hparams)
+    model = plu.models.mlp.MLPModel(**hparams)
 
     # create trainer
     trainer = pl.Trainer.from_argparse_args(hparams_args)
@@ -163,7 +163,7 @@ def main():
     trainer.test(model, datamodule=data_module)
 
     # export model
-    onnx_filepath = 'fc_example.onnx'
+    onnx_filepath = 'mlp_example.onnx'
     onnx_batch_size = 1
     input_sample = torch.randn((onnx_batch_size, input_dim))
     model.to_onnx(onnx_filepath, input_sample, export_params=True)

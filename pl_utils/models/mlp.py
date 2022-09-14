@@ -1,4 +1,4 @@
-"""Fully Connected Model."""
+"""Multi Layer Perceptron Model."""
 
 import argparse
 from collections import OrderedDict
@@ -9,8 +9,8 @@ import torch
 
 
 # pylint: disable=too-many-ancestors
-class FCModel(pl.LightningModule):
-    """FC Network."""
+class MLPModel(pl.LightningModule):
+    """MLP Network."""
 
     def __init__(self, **kwargs):
         """Initialize fully connected layers."""
@@ -21,20 +21,20 @@ class FCModel(pl.LightningModule):
         layer_dims_list_str = self.hparams.layer_dims.split()
         layer_dims = [int(layer_dim)
                       for layer_dim in layer_dims_list_str]
-        fc_layers = OrderedDict()
+        mlp_layers = OrderedDict()
 
         for layer_idx, _ in enumerate(layer_dims[0:-2]):
-            fc_layers['linear' + str(layer_idx + 1)] = \
+            mlp_layers['linear' + str(layer_idx + 1)] = \
                 torch.nn.Linear(layer_dims[layer_idx],
                                 layer_dims[layer_idx + 1])
-            fc_layers['silu' + str(layer_idx + 1)] = torch.nn.SiLU()
+            mlp_layers['silu' + str(layer_idx + 1)] = torch.nn.SiLU()
 
         layer_idx = len(layer_dims) - 2
-        fc_layers['linear' + str(layer_idx + 1)] = \
+        mlp_layers['linear' + str(layer_idx + 1)] = \
             torch.nn.Linear(layer_dims[layer_idx],
                             layer_dims[layer_idx + 1])
 
-        self.model = torch.nn.Sequential(fc_layers)
+        self.model = torch.nn.Sequential(mlp_layers)
 
     # pylint: disable=arguments-differ
     def forward(self, input_):

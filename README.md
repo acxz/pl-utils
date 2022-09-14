@@ -20,8 +20,8 @@ pip install .
 
 Example usage is in `examples/`.
 
-Running `python examples/fc_example.py` and then
-`python examples/fc_visualization.py` gives:
+Running `python examples/mlp_example.py` and then
+`python examples/mlp_visualization.py` gives:
 ![mlp_regression_example_plot](https://user-images.githubusercontent.com/17132214/187483104-9a368126-db4a-4304-ba9e-204e2dc059de.png)
 
 Running `python examples/gp_regression_example.py` and then
