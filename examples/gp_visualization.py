@@ -14,7 +14,7 @@ def main():
     predict_input_data = torch.linspace(0, x_domain, samples).unsqueeze(1)
 
     # load model
-    pt_path = 'gp_regression_example.pt'
+    pt_path = 'gp_example.pt'
     checkpoint = torch.load(pt_path)
     model_state_dict = checkpoint['model_state_dict']
     train_input_data = checkpoint['train_input_data']

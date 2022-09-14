@@ -175,7 +175,7 @@ def main():
     trainer.test(model, datamodule=data_module)
 
     # export model
-    pt_filepath = 'gp_regression_example.pt'
+    pt_filepath = 'gp_example.pt'
     torch.save({'model_state_dict': model.state_dict(),
                 'train_input_data': train_input_data,
                 'train_output_data': train_output_data},
@@ -183,7 +183,7 @@ def main():
 
     # export model in onnx
     # below does not work yet
-    # onnx_filepath = 'gp_regression_example.onnx'
+    # onnx_filepath = 'gp_example.onnx'
     # onnx_batch_size = 1
     # input_dim = 1
     # input_sample = torch.randn((onnx_batch_size, input_dim))
